@@ -8,6 +8,7 @@ from os.path import dirname, join
 
 from rsconnect.environment import detect_environment
 from rsconnect.bundle import (
+    directories_to_ignore,
     list_files,
     make_manifest_bundle,
     make_notebook_html_bundle,
@@ -219,44 +220,35 @@ class TestBundle(TestCase):
         try:
             names = sorted(tar.getnames())
             self.assertEqual(
-                names,
-                [
-                    "dummy.html",
-                    "manifest.json",
-                ],
+                names, ["dummy.html", "manifest.json",],
             )
 
             manifest = json.loads(tar.extractfile("manifest.json").read().decode("utf-8"))
 
             # noinspection SpellCheckingInspection
             self.assertEqual(
-                manifest,
-                {
-                    u"version": 1,
-                    u"metadata": {
-                        u"appmode": u"static",
-                        u"primary_html": u"dummy.html",
-                    },
-                },
+                manifest, {u"version": 1, u"metadata": {u"appmode": u"static", u"primary_html": u"dummy.html",},},
             )
         finally:
             tar.close()
             bundle.close()
 
     def test_keep_manifest_specified_file(self):
-        self.assertTrue(keep_manifest_specified_file("app.R"))
-        self.assertFalse(keep_manifest_specified_file("packrat/packrat.lock"))
-        self.assertTrue(keep_manifest_specified_file("rsconnect"))
-        self.assertFalse(keep_manifest_specified_file("rsconnect/bogus.file"))
-        self.assertTrue(keep_manifest_specified_file("rsconnect-python"))
-        self.assertFalse(keep_manifest_specified_file("rsconnect-python/bogus.file"))
-        self.assertFalse(keep_manifest_specified_file(".svn/bogus.file"))
-        self.assertFalse(keep_manifest_specified_file(".env/share/jupyter/kernels/python3/kernel.json"))
-        self.assertFalse(keep_manifest_specified_file(".venv/bin/activate"))
-        self.assertFalse(keep_manifest_specified_file("env/pyvenv.cfg"))
-        self.assertFalse(keep_manifest_specified_file("venv/lib/python3.8/site-packages/wheel/__init__.py"))
+        # test exclusions - the default list, plus discovered virtualenvs
+        ex = directories_to_ignore + [".env/", ".venv/", "env/", "venv/"]
+        self.assertTrue(keep_manifest_specified_file(ex, "app.R"))
+        self.assertFalse(keep_manifest_specified_file(ex, "packrat/packrat.lock"))
+        self.assertTrue(keep_manifest_specified_file(ex, "rsconnect"))
+        self.assertFalse(keep_manifest_specified_file(ex, "rsconnect/bogus.file"))
+        self.assertTrue(keep_manifest_specified_file(ex, "rsconnect-python"))
+        self.assertFalse(keep_manifest_specified_file(ex, "rsconnect-python/bogus.file"))
+        self.assertFalse(keep_manifest_specified_file(ex, ".svn/bogus.file"))
+        self.assertFalse(keep_manifest_specified_file(ex, ".env/share/jupyter/kernels/python3/kernel.json"))
+        self.assertFalse(keep_manifest_specified_file(ex, ".venv/bin/activate"))
+        self.assertFalse(keep_manifest_specified_file(ex, "env/pyvenv.cfg"))
+        self.assertFalse(keep_manifest_specified_file(ex, "venv/lib/python3.8/site-packages/wheel/__init__.py"))
         # noinspection SpellCheckingInspection
-        self.assertFalse(keep_manifest_specified_file(".Rproj.user/bogus.file"))
+        self.assertFalse(keep_manifest_specified_file(ex, ".Rproj.user/bogus.file"))
 
     def test_manifest_bundle(self):
         self.maxDiff = 5000
@@ -266,5 +258,6 @@ class TestBundle(TestCase):
         with make_manifest_bundle(manifest_path) as bundle, tarfile.open(mode="r:gz", fileobj=bundle) as tar:
             tar_names = sorted(tar.getnames())
             manifest = json.loads(tar.extractfile("manifest.json").read().decode("utf-8"))
-            manifest_names = sorted(filter(keep_manifest_specified_file, manifest["files"].keys()))
+            kept = filter(lambda f: keep_manifest_specified_file(directories_to_ignore, f), manifest["files"].keys())
+            manifest_names = sorted(kept)
             self.assertEqual(tar_names, manifest_names)

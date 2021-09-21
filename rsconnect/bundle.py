@@ -321,7 +321,7 @@ def make_notebook_html_bundle(
     return bundle_file
 
 
-def keep_manifest_specified_file(relative_path):
+def keep_manifest_specified_file(excludes, relative_path):
     """
     A helper to see if the relative path given, which is assumed to have come
     from a manifest.json file, should be kept or ignored.
@@ -329,7 +329,7 @@ def keep_manifest_specified_file(relative_path):
     :param relative_path: the relative path name to check.
     :return: True, if the path should kept or False, if it should be ignored.
     """
-    for ignore_me in directories_to_ignore:
+    for ignore_me in excludes:
         if relative_path.startswith(ignore_me):
             return False
     return True
@@ -358,7 +358,8 @@ def make_manifest_bundle(manifest_path):
     manifest, raw_manifest = read_manifest_file(manifest_path)
 
     base_dir = dirname(manifest_path)
-    files = list(filter(keep_manifest_specified_file, manifest.get("files", {}).keys()))
+    excludes = directories_to_ignore + list_environment_dirs(base_dir)
+    files = list(filter(lambda f: keep_manifest_specified_file(excludes, f), manifest.get("files", {}).keys()))
 
     if "manifest.json" in files:
         # this will be created
@@ -415,7 +416,7 @@ def list_environment_dirs(directory):
     for name in os.listdir(directory):
         path = join(directory, name)
         if is_environment_dir(path):
-            envs.append(name)
+            envs.append(name + "/")
     return envs
 
 
@@ -445,6 +446,7 @@ def _create_api_file_list(
 
     # Don't include these top-level files.
     excludes = list(excludes) if excludes else []
+    excludes.extend(directories_to_ignore)
     excludes.append("manifest.json")
     excludes.append(requirements_file_name)
     excludes.extend(list_environment_dirs(directory))
@@ -457,7 +459,7 @@ def _create_api_file_list(
             abs_path = os.path.join(subdir, file)
             rel_path = os.path.relpath(abs_path, directory)
 
-            if keep_manifest_specified_file(rel_path) and (rel_path in extra_files or not glob_set.matches(abs_path)):
+            if rel_path in extra_files or not glob_set.matches(abs_path):
                 file_list.append(rel_path)
                 # Don't add extra files more than once.
                 if rel_path in extra_files:
