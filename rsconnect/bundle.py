@@ -25,17 +25,13 @@ from rsconnect.environment import Environment
 # noinspection SpellCheckingInspection
 directories_to_ignore = [
     ".Rproj.user/",
-    ".env/",
     ".git/",
     ".svn/",
-    ".venv/",
     "__pycache__/",
-    "env/",
     "packrat/",
     "renv/",
     "rsconnect-python/",
     "rsconnect/",
-    "venv/",
 ]
 
 
